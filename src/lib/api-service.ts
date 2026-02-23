@@ -111,7 +111,32 @@ export async function ingestArticle(req: IngestRequest, useMock: boolean): Promi
     MOCK_INGEST_RESPONSE,
     useMock,
   );
-  return data;
+  const raw = data as unknown;
+  let normalized = data;
+
+  // Some n8n flows return an array of items from webhook response mode.
+  if (Array.isArray(raw) && raw.length > 0) {
+    normalized = raw[0] as IngestResponse;
+  }
+
+  if ((normalized as { success?: boolean }).success) {
+    const success = normalized as {
+      success: true;
+      articleId?: string | null;
+      title?: string | null;
+      chunksCreated?: number | null;
+      message?: string | null;
+    };
+    return {
+      success: true,
+      articleId: success.articleId || req.articleId,
+      title: success.title || req.title,
+      chunksCreated: typeof success.chunksCreated === "number" ? success.chunksCreated : 0,
+      message: success.message || "Article ingested into vector store",
+    };
+  }
+
+  return normalized;
 }
 
 function getErrorMessage(err: unknown): string {
