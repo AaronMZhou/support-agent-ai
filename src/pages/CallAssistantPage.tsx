@@ -87,7 +87,7 @@ export default function CallAssistantPage() {
   const [captureProcessing, setCaptureProcessing] = useState(false);
   const [captureErrorMsg, setCaptureErrorMsg] = useState("");
   const [lastCapturedSnippet, setLastCapturedSnippet] = useState("");
-  const [transcriptionMode, setTranscriptionMode] = useState<TranscriptionMode>("api");
+  const [transcriptionMode, setTranscriptionMode] = useState<TranscriptionMode>("browser");
   const [includeSystemAudio, setIncludeSystemAudio] = useState(true);
   const [autoStartOnCall, setAutoStartOnCall] = useState(true);
 
@@ -328,6 +328,14 @@ export default function CallAssistantPage() {
   }, [callId, autoStartOnCall, startLiveCapture]);
 
   const doQuery = useCallback(async (action: "analyze_transcript" | "continue_call" | "end_call") => {
+    const hasChunk = !!chunk.trim();
+    const hasFullTranscript = !!fullTranscript.trim();
+    if (!hasChunk && !hasFullTranscript) {
+      setErrorMsg("Add transcript text first (manual paste or Start Listening) before running analysis.");
+      setStatus("error");
+      return;
+    }
+
     setStatus("sending");
     setErrorMsg("");
     try {

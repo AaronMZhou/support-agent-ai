@@ -94,6 +94,13 @@ export async function sendQuery(req: QueryRequest, useMock: boolean): Promise<Qu
     MOCK_QUERY_RESPONSE,
     useMock,
   );
+  const maybeWrapped = data as unknown as {
+    success?: boolean;
+    result?: QueryResponse;
+  };
+  if (maybeWrapped && maybeWrapped.success === true && maybeWrapped.result) {
+    return maybeWrapped.result;
+  }
   return data;
 }
 
