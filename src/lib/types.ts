@@ -114,6 +114,15 @@ export interface IngestSuccessResponse {
 
 export type IngestResponse = IngestSuccessResponse | ApiErrorResponse;
 
+// ---- Transcription API Types ----
+
+export interface TranscribeResponse {
+  transcript?: string;
+  text?: string;
+  success?: boolean;
+  error?: string;
+}
+
 // ---- Debug Log ----
 
 export interface ApiLog {

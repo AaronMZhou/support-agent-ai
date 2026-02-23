@@ -1,6 +1,14 @@
 import { API_CONFIG } from "./api-config";
 import { MOCK_QUERY_RESPONSE, MOCK_INGEST_RESPONSE } from "./mock-data";
-import type { QueryRequest, QueryResponse, IngestRequest, IngestResponse, ApiLog, ApiErrorResponse } from "./types";
+import type {
+  QueryRequest,
+  QueryResponse,
+  IngestRequest,
+  IngestResponse,
+  ApiLog,
+  ApiErrorResponse,
+  TranscribeResponse,
+} from "./types";
 
 let apiLogs: ApiLog[] = [];
 let logListeners: Array<(logs: ApiLog[]) => void> = [];
@@ -97,4 +105,82 @@ export async function ingestArticle(req: IngestRequest, useMock: boolean): Promi
     useMock,
   );
   return data;
+}
+
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return "Unknown error";
+}
+
+function extractTranscript(data: TranscribeResponse): string {
+  if (typeof data.transcript === "string" && data.transcript.trim()) return data.transcript.trim();
+  if (typeof data.text === "string" && data.text.trim()) return data.text.trim();
+  return "";
+}
+
+export async function transcribeAudioChunk(audioBlob: Blob, callId: string): Promise<string> {
+  if (!API_CONFIG.TRANSCRIBE_ENDPOINT) {
+    throw new Error("Transcription endpoint is not configured (VITE_TRANSCRIBE_ENDPOINT)");
+  }
+
+  const endpoint = API_CONFIG.TRANSCRIBE_ENDPOINT;
+  const logEntry: ApiLog = {
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+    endpoint,
+    method: "POST",
+    requestBody: {
+      callId,
+      sizeBytes: audioBlob.size,
+      mimeType: audioBlob.type || "audio/webm",
+    },
+    responseBody: null,
+    status: null,
+    durationMs: null,
+  };
+
+  const formData = new FormData();
+  formData.append("file", audioBlob, `call-${callId}-${Date.now()}.webm`);
+  formData.append("callId", callId);
+
+  const start = performance.now();
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      body: formData,
+    });
+    const elapsed = Math.round(performance.now() - start);
+    let data: TranscribeResponse;
+    try {
+      data = (await res.json()) as TranscribeResponse;
+    } catch {
+      throw new Error(`Non-JSON transcription response (status ${res.status})`);
+    }
+
+    logEntry.responseBody = data;
+    logEntry.status = res.status;
+    logEntry.durationMs = elapsed;
+    pushLog(logEntry);
+
+    if (!res.ok) {
+      throw new Error(typeof data.error === "string" ? data.error : `Transcription request failed (status ${res.status})`);
+    }
+    if (data.success === false) {
+      throw new Error(typeof data.error === "string" ? data.error : "Transcription API returned error");
+    }
+
+    const transcript = extractTranscript(data);
+    if (!transcript) {
+      throw new Error("Transcription response missing transcript/text");
+    }
+
+    return transcript;
+  } catch (err: unknown) {
+    const elapsed = Math.round(performance.now() - start);
+    logEntry.durationMs = elapsed;
+    logEntry.status = logEntry.status ?? 0;
+    logEntry.responseBody = logEntry.responseBody ?? { error: getErrorMessage(err) };
+    pushLog(logEntry);
+    throw err;
+  }
 }

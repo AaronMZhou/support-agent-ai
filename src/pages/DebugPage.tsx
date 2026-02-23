@@ -29,6 +29,7 @@ export default function DebugPage() {
         <CardContent className="space-y-2">
           <EndpointRow label="Query" url={API_CONFIG.QUERY_ENDPOINT} />
           <EndpointRow label="Ingest" url={API_CONFIG.INGEST_ENDPOINT} />
+          <EndpointRow label="Transcribe" url={API_CONFIG.TRANSCRIBE_ENDPOINT || "(not configured)"} />
         </CardContent>
       </Card>
 
