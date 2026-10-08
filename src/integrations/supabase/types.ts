@@ -14,13 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      mock_tickets: {
+        Row: {
+          call_id: string
+          created_at: string
+          external_id: string
+          id: string
+          idempotency_key: string
+          payload: Json
+        }
+        Insert: {
+          call_id: string
+          created_at?: string
+          external_id: string
+          id?: string
+          idempotency_key: string
+          payload: Json
+        }
+        Update: {
+          call_id?: string
+          created_at?: string
+          external_id?: string
+          id?: string
+          idempotency_key?: string
+          payload?: Json
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      ticket_jobs: {
+        Row: {
+          ai_draft: Json
+          attempts: number
+          call_id: string
+          created_at: string
+          edited: boolean
+          external_ticket_id: string | null
+          final_draft: Json
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          locked_until: string | null
+          max_attempts: number
+          next_attempt_at: string
+          status: string
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_draft: Json
+          attempts?: number
+          call_id: string
+          created_at?: string
+          edited?: boolean
+          external_ticket_id?: string | null
+          final_draft: Json
+          id?: string
+          idempotency_key: string
+          last_error?: string | null
+          locked_until?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          status?: string
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          ai_draft?: Json
+          attempts?: number
+          call_id?: string
+          created_at?: string
+          edited?: boolean
+          external_ticket_id?: string | null
+          final_draft?: Json
+          id?: string
+          idempotency_key?: string
+          last_error?: string | null
+          locked_until?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          status?: string
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      claim_ticket_jobs: {
+        Args: { p_lease_seconds: number; p_limit: number }
+        Returns: {
+          ai_draft: Json
+          attempts: number
+          call_id: string
+          created_at: string
+          edited: boolean
+          external_ticket_id: string | null
+          final_draft: Json
+          id: string
+          idempotency_key: string
+          last_error: string | null
+          locked_until: string | null
+          max_attempts: number
+          next_attempt_at: string
+          status: string
+          technician_id: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "ticket_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       [_ in never]: never

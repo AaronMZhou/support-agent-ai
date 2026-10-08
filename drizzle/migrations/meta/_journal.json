@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791426566388,
+      "tag": "0000_ticket_queue",
+      "breakpoints": true
+    }
+  ]
 }
