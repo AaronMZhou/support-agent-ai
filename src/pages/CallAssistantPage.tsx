@@ -436,7 +436,7 @@ export default function CallAssistantPage() {
       {/* RIGHT COLUMN */}
       <div className="space-y-4">
         <AIRecommendationsCard response={aiResponse} status={status} errorMsg={errorMsg} />
-        <TicketDraftCard draft={aiResponse?.ticketDraft ?? null} />
+        <TicketDraftCard draft={aiResponse?.ticketDraft ?? null} callId={callId} />
       </div>
     </div>
   );
