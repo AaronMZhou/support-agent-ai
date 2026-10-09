@@ -149,6 +149,91 @@ export async function processJob(job: QueueJob, deps: ProcessDeps): Promise<JobO
   }
 }
 
+export interface HttpTicketApiOptions {
+  headers?: Record<string, string>;
+  timeoutMs?: number;
+}
+
+/**
+ * POST one ticket with its Idempotency-Key. Dropped connections, timeouts and
+ * a 2xx without a ticket id all surface as retryable: the ticket may or may
+ * not exist, and the key makes sending it again safe.
+ */
+export async function createTicketOverHttp(
+  url: string,
+  key: string,
+  payload: unknown,
+  opts: HttpTicketApiOptions = {},
+): Promise<{ externalId: string }> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...opts.headers, "Idempotency-Key": key },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 10_000),
+    });
+  } catch (e) {
+    throw new TicketApiError(`Network error: ${(e as Error).message}`, null);
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new TicketApiError(body?.error ?? `Ticket API status ${res.status}`, res.status);
+  if (!body?.externalId) throw new TicketApiError("Ticket API response had no ticket id", null);
+  return { externalId: String(body.externalId) };
+}
+
+/** Column changes that record a delivery outcome on its ticket_jobs row. */
+export function outcomePatch(outcome: JobOutcome, now: Date): Record<string, unknown> {
+  const base = { attempts: outcome.attempts, locked_until: null, updated_at: now.toISOString() };
+  if (outcome.kind === "succeeded") {
+    return { ...base, status: "succeeded", external_ticket_id: outcome.externalId, last_error: null };
+  }
+  if (outcome.kind === "retry") {
+    return { ...base, status: "pending", next_attempt_at: outcome.nextAttemptAt.toISOString(), last_error: outcome.error };
+  }
+  return { ...base, status: "dead_letter", last_error: outcome.error };
+}
+
+export type ClaimedJob = QueueJob & { id: string };
+
+export interface JobStore {
+  /** Lease up to `limit` ready jobs (pending and due, or processing with an expired lease). */
+  claim: (limit: number, leaseSeconds: number) => Promise<ClaimedJob[]>;
+  /** Record the outcome. May throw; the lease then expires and the job is delivered again. */
+  save: (job: ClaimedJob, outcome: JobOutcome) => Promise<void>;
+}
+
+export interface BatchResult {
+  claimed: number;
+  succeeded: number;
+  retried: number;
+  deadLettered: number;
+  unsaved: number;
+}
+
+/** Claim and process one bounded batch. Each job's result is saved as soon as it finishes. */
+export async function runBatch(
+  store: JobStore,
+  deps: ProcessDeps,
+  opts: { limit?: number; leaseSeconds?: number } = {},
+): Promise<BatchResult> {
+  const jobs = await store.claim(opts.limit ?? 10, opts.leaseSeconds ?? 120);
+  const result: BatchResult = { claimed: jobs.length, succeeded: 0, retried: 0, deadLettered: 0, unsaved: 0 };
+  for (const job of jobs) {
+    const outcome = await processJob(job, deps);
+    try {
+      await store.save(job, outcome);
+    } catch {
+      result.unsaved++;
+      continue;
+    }
+    if (outcome.kind === "succeeded") result.succeeded++;
+    else if (outcome.kind === "retry") result.retried++;
+    else result.deadLettered++;
+  }
+  return result;
+}
+
 /** Deterministic PRNG for repeatable failure injection. */
 export function seededRandom(seed: number): () => number {
   let s = seed >>> 0;

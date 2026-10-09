@@ -8,6 +8,7 @@ import {
   isRetryable,
   TicketApiError,
   processJob,
+  runBatch,
   pickFailure,
   seededRandom,
 } from "../../supabase/functions/_shared/ticket-core";
@@ -89,6 +90,14 @@ describe("backoff and retry policy", () => {
       { createTicket: async () => { throw new TicketApiError("bad", 422); } },
     );
     expect(out).toMatchObject({ kind: "dead_letter", attempts: 1 });
+  });
+  it("leaves a job for redelivery when its result cannot be saved", async () => {
+    const job = { id: "1", idempotency_key: "k", call_id: "c", final_draft: draft, attempts: 0, max_attempts: 5 };
+    const result = await runBatch(
+      { claim: async () => [job], save: async () => { throw new Error("db down"); } },
+      { createTicket: async () => ({ externalId: "TKT-1" }) },
+    );
+    expect(result).toEqual({ claimed: 1, succeeded: 0, retried: 0, deadLettered: 0, unsaved: 1 });
   });
   it("schedules a retry in the future", async () => {
     const now = new Date("2026-01-01T00:00:00Z");
