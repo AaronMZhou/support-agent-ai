@@ -251,11 +251,25 @@ export default function CallAssistantPage() {
 
       let systemStream: MediaStream | null = null;
       if (includeSystemAudio) {
-        systemStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
-        if (systemStream.getAudioTracks().length === 0) {
-          throw new Error("No system audio track selected. Re-run and enable audio share.");
+        try {
+          systemStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+          if (systemStream.getAudioTracks().length === 0) {
+            systemStream.getTracks().forEach((t) => t.stop());
+            systemStream = null;
+            setCaptureErrorMsg("No system audio shared — continuing with microphone only. Re-run and tick 'Share tab audio'.");
+          } else {
+            systemStreamRef.current = systemStream;
+          }
+        } catch (displayErr: unknown) {
+          const name = displayErr instanceof Error ? displayErr.name : "";
+          if (name === "NotAllowedError" || name === "SecurityError") {
+            setCaptureErrorMsg(
+              "Computer audio was blocked, so only your microphone is captured. If you're viewing the app in the embedded preview, open it in a full browser tab instead — screen/audio sharing is restricted inside the preview frame."
+            );
+          } else {
+            throw displayErr;
+          }
         }
-        systemStreamRef.current = systemStream;
       }
 
       const audioContext = new AudioContext();
@@ -318,7 +332,11 @@ export default function CallAssistantPage() {
       startSegment();
       setCaptureListening(true);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Unable to start audio capture.";
+      const name = err instanceof Error ? err.name : "";
+      let message = err instanceof Error ? err.message : "Unable to start audio capture.";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        message = "Microphone permission was denied. Click the camera/mic icon in your browser's address bar, allow the microphone for this site, then try again.";
+      }
       setCaptureErrorMsg(message);
       stopLiveCapture();
     }
