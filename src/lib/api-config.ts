@@ -2,5 +2,5 @@
 export const API_CONFIG = {
   QUERY_ENDPOINT: "https://zhoumaaron.app.n8n.cloud/webhook/it-support-agent/query",
   INGEST_ENDPOINT: "https://zhoumaaron.app.n8n.cloud/webhook/it-support-agent/ingest",
-  TRANSCRIBE_ENDPOINT: import.meta.env.VITE_TRANSCRIBE_ENDPOINT ?? "",
+  TRANSCRIBE_ENDPOINT: import.meta.env.VITE_TRANSCRIBE_ENDPOINT || `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
 } as const;
