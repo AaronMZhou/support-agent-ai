@@ -81,8 +81,8 @@ export function LiveCaptureCard({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="api">API (audio chunks, supports system audio)</SelectItem>
-              <SelectItem value="browser">Browser Speech (free, mic only)</SelectItem>
+              <SelectItem value="api">Mic + computer audio (recommended)</SelectItem>
+              <SelectItem value="browser">Browser speech (mic only)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -110,13 +110,13 @@ export function LiveCaptureCard({
           />
           <Label htmlFor="include-system-audio" className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1">
             <MonitorSpeaker className="h-3.5 w-3.5" />
-            Include system/tab audio
+            Include computer audio (the caller)
           </Label>
         </div>
 
         <p className="text-[11px] text-muted-foreground">
           {useApiMode
-            ? "For system audio capture, select a browser tab/window and enable audio sharing in the browser prompt."
+            ? "When asked, pick the screen, window or tab where the call is playing and turn on \"Share audio\". On Windows, sharing the entire screen captures all computer audio. Text appears about every 6 seconds."
             : "Browser Speech mode uses native speech recognition and listens to microphone input only."}
         </p>
 

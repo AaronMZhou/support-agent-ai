@@ -87,11 +87,13 @@ export default function CallAssistantPage() {
   const [captureProcessing, setCaptureProcessing] = useState(false);
   const [captureErrorMsg, setCaptureErrorMsg] = useState("");
   const [lastCapturedSnippet, setLastCapturedSnippet] = useState("");
-  const [transcriptionMode, setTranscriptionMode] = useState<TranscriptionMode>("browser");
+  const [transcriptionMode, setTranscriptionMode] = useState<TranscriptionMode>("api");
   const [includeSystemAudio, setIncludeSystemAudio] = useState(true);
   const [autoStartOnCall, setAutoStartOnCall] = useState(true);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const segmentingRef = useRef(false);
+  const segmentTimerRef = useRef<number | null>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const speechShouldRunRef = useRef(false);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -160,6 +162,11 @@ export default function CallAssistantPage() {
       speechRecognitionRef.current = null;
     }
 
+    segmentingRef.current = false;
+    if (segmentTimerRef.current) {
+      window.clearTimeout(segmentTimerRef.current);
+      segmentTimerRef.current = null;
+    }
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== "inactive") {
       recorder.stop();
@@ -271,21 +278,33 @@ export default function CallAssistantPage() {
 
       const mimeType = getSupportedAudioMimeType();
       const recorderOptions: MediaRecorderOptions = mimeType ? { mimeType } : {};
-      const recorder = new MediaRecorder(mixedStream, recorderOptions);
-      recorderRef.current = recorder;
+      segmentingRef.current = true;
 
-      recorder.ondataavailable = (event: BlobEvent) => {
-        if (event.data.size > 0) {
-          enqueueTranscription(event.data);
-        }
-      };
-
-      recorder.onerror = () => {
-        setCaptureErrorMsg("Audio recorder failed.");
-      };
-
-      recorder.onstop = () => {
-        releaseCaptureResources();
+      // Each segment is its own recording so every upload is a complete audio file.
+      const startSegment = () => {
+        const recorder = new MediaRecorder(mixedStream, recorderOptions);
+        recorderRef.current = recorder;
+        const parts: Blob[] = [];
+        recorder.ondataavailable = (event: BlobEvent) => {
+          if (event.data.size > 0) parts.push(event.data);
+        };
+        recorder.onerror = () => {
+          setCaptureErrorMsg("Audio recorder failed.");
+        };
+        recorder.onstop = () => {
+          if (parts.length) {
+            enqueueTranscription(new Blob(parts, { type: (mimeType ?? "audio/webm").split(";")[0] }));
+          }
+          if (segmentingRef.current) {
+            startSegment();
+          } else {
+            releaseCaptureResources();
+          }
+        };
+        recorder.start();
+        segmentTimerRef.current = window.setTimeout(() => {
+          if (recorder.state !== "inactive") recorder.stop();
+        }, 6000);
       };
 
       if (systemStream) {
@@ -296,7 +315,7 @@ export default function CallAssistantPage() {
         });
       }
 
-      recorder.start(5000);
+      startSegment();
       setCaptureListening(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unable to start audio capture.";

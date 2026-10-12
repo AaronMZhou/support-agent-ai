@@ -1,4 +1,5 @@
 import { API_CONFIG } from "./api-config";
+import { supabase } from "@/integrations/supabase/client";
 import { MOCK_QUERY_RESPONSE, MOCK_INGEST_RESPONSE } from "./mock-data";
 import type {
   QueryRequest,
@@ -177,8 +178,14 @@ export async function transcribeAudioChunk(audioBlob: Blob, callId: string): Pro
 
   const start = performance.now();
   try {
+    const { data: sess } = await supabase.auth.getSession();
+    const headers: Record<string, string> = {
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    };
+    if (sess.session) headers.Authorization = `Bearer ${sess.session.access_token}`;
     const res = await fetch(endpoint, {
       method: "POST",
+      headers,
       body: formData,
     });
     const elapsed = Math.round(performance.now() - start);
