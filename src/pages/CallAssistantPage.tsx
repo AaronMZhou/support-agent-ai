@@ -332,7 +332,11 @@ export default function CallAssistantPage() {
       startSegment();
       setCaptureListening(true);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Unable to start audio capture.";
+      const name = err instanceof Error ? err.name : "";
+      let message = err instanceof Error ? err.message : "Unable to start audio capture.";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        message = "Microphone permission was denied. Click the camera/mic icon in your browser's address bar, allow the microphone for this site, then try again.";
+      }
       setCaptureErrorMsg(message);
       stopLiveCapture();
     }
